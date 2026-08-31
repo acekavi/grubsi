@@ -1,12 +1,20 @@
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
+use grubsi_server::infra::db::Db;
 use grubsi_server::{AppState, build_router};
 use http_body_util::BodyExt;
 use tower::ServiceExt;
 
+async fn state() -> (tempfile::TempDir, AppState) {
+    let dir = tempfile::tempdir().unwrap();
+    let db = Db::open(&dir.path().join("grubsi.db")).await.unwrap();
+    (dir, AppState::new(db))
+}
+
 #[tokio::test]
 async fn health_reports_ok() {
-    let app = build_router(AppState::new());
+    let (_dir, st) = state().await;
+    let app = build_router(st);
 
     let response = app
         .oneshot(
@@ -29,7 +37,8 @@ async fn health_reports_ok() {
 async fn unknown_api_routes_return_json_not_html() {
     // A steward's tablet parses JSON. An unknown /api path must not fall
     // through to the SPA and hand it an HTML document.
-    let app = build_router(AppState::new());
+    let (_dir, st) = state().await;
+    let app = build_router(st);
 
     let response = app
         .oneshot(
@@ -56,7 +65,8 @@ async fn unknown_api_routes_return_json_not_html() {
 
 #[tokio::test]
 async fn openapi_document_lists_the_health_path() {
-    let app = build_router(AppState::new());
+    let (_dir, st) = state().await;
+    let app = build_router(st);
 
     let response = app
         .oneshot(

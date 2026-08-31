@@ -17,7 +17,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .and_then(|p| p.parse().ok())
         .unwrap_or(8080);
 
-    let app = build_router(AppState::new());
+    let db_path = std::env::var("GRUBSI_DB").unwrap_or_else(|_| "grubsi.db".to_owned());
+    let db = grubsi_server::infra::db::Db::open(std::path::Path::new(&db_path)).await?;
+    tracing::info!(path = %db_path, "database ready");
+
+    let app = build_router(AppState::new(db));
 
     // Bind all interfaces: staff tablets and customer phones reach this
     // over the restaurant LAN, not over loopback.

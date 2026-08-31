@@ -1,22 +1,19 @@
 use chrono::{DateTime, Utc};
 
-/// Shared application state. Grows through M0: the database lands in Task 4
-/// and the event hub in Task 6.
+use crate::infra::db::Db;
+
+/// Shared application state. The event hub lands in Task 6.
 #[derive(Clone)]
 pub struct AppState {
     pub started_at: DateTime<Utc>,
+    pub db: Db,
 }
 
 impl AppState {
-    pub fn new() -> Self {
+    pub fn new(db: Db) -> Self {
         Self {
             started_at: Utc::now(),
+            db,
         }
-    }
-}
-
-impl Default for AppState {
-    fn default() -> Self {
-        Self::new()
     }
 }
