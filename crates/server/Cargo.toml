@@ -1,0 +1,36 @@
+[package]
+name = "grubsi-server"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+version = "0.1.0"
+
+[lib]
+name = "grubsi_server"
+path = "src/lib.rs"
+
+[[bin]]
+name = "grubsi-server"
+path = "src/main.rs"
+
+[dependencies]
+grubsi-core = { workspace = true }
+grubsi-escpos = { workspace = true }
+axum = { workspace = true }
+tokio = { workspace = true }
+sqlx = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+utoipa = { workspace = true }
+rust-embed = { workspace = true }
+futures = { workspace = true }
+mime_guess = { workspace = true }
+
+[dev-dependencies]
+tower = { workspace = true, features = ["util"] }
+tempfile = { workspace = true }

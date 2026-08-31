@@ -1,0 +1,30 @@
+[workspace]
+resolver = "3"
+members = ["crates/core", "crates/escpos", "crates/server"]
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.97"
+license = "MIT"
+
+[workspace.dependencies]
+grubsi-core = { path = "crates/core" }
+grubsi-escpos = { path = "crates/escpos" }
+
+tokio = { version = "1.53", features = ["rt-multi-thread", "macros", "net", "time", "sync", "signal", "io-util"] }
+axum = { version = "0.8", features = ["ws", "macros"] }
+sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "sqlite", "uuid", "chrono", "migrate", "macros"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+uuid = { version = "1", features = ["v7", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+utoipa = { version = "5", features = ["axum_extras", "uuid", "chrono"] }
+rust-embed = "8"
+async-trait = "0.1"
+futures = "0.3"
+mime_guess = "2"
+tower = "0.5"
+tempfile = "3"
