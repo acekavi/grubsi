@@ -1,7 +1,10 @@
 use futures::FutureExt;
+use grubsi_core::event::{DomainEvent, EventKind};
 use grubsi_server::infra::db::Db;
 use grubsi_server::infra::error::AppError;
 use grubsi_server::infra::write::{AuditRecord, write_tx};
+use grubsi_server::infra::ws::EventHub;
+use tokio::sync::broadcast::error::TryRecvError;
 
 async fn temp_db() -> (tempfile::TempDir, Db) {
     let dir = tempfile::tempdir().unwrap();
@@ -71,9 +74,7 @@ async fn a_failing_mutation_leaves_no_audit_record() {
             sqlx::query("INSERT INTO probe (id, note) VALUES (1, 'hello')")
                 .execute(&mut *conn)
                 .await?;
-            Err::<((), Vec<grubsi_core::event::DomainEvent>), AppError>(AppError::internal(
-                "deliberate failure",
-            ))
+            Err::<((), Vec<DomainEvent>), AppError>(AppError::internal("deliberate failure"))
         }
         .boxed()
     })
@@ -85,17 +86,46 @@ async fn a_failing_mutation_leaves_no_audit_record() {
 }
 
 #[tokio::test]
-async fn events_are_returned_for_the_caller_to_publish_after_commit() {
-    // write_tx must not publish. Returning events is what keeps the
-    // after-commit rule structurally hard to violate.
+async fn write_tx_never_publishes_it_hands_the_events_back() {
+    // The after-commit rule: `write_tx` must not touch the hub, because a
+    // rolled-back transaction would otherwise have already broadcast state
+    // that never existed. Watching a real subscriber is what makes that
+    // falsifiable — asserting on the returned Vec alone cannot fail.
     let (_dir, db) = temp_db().await;
+    let hub = EventHub::new();
+    let mut rx = hub.subscribe();
 
+    // A write that fails *after* doing its insert and producing an event.
+    let failed = write_tx(&db, AuditRecord::new("probe.create", "probe"), |conn| {
+        async move {
+            sqlx::query("INSERT INTO probe (id, note) VALUES (7, 'x')")
+                .execute(&mut *conn)
+                .await?;
+            Err::<((), Vec<DomainEvent>), AppError>(AppError::internal("deliberate failure"))
+        }
+        .boxed()
+    })
+    .await;
+
+    assert!(failed.is_err());
+    assert_eq!(
+        probe_count(&db).await,
+        0,
+        "the insert must have rolled back"
+    );
+    assert!(
+        matches!(rx.try_recv(), Err(TryRecvError::Empty)),
+        "a rolled-back write must not have published anything"
+    );
+
+    // And a write that succeeds still publishes nothing: the events come
+    // back to the caller, who publishes them once the commit has landed.
     let written = write_tx(&db, AuditRecord::new("probe.create", "probe"), |conn| {
         async move {
             sqlx::query("INSERT INTO probe (id, note) VALUES (7, 'x')")
                 .execute(&mut *conn)
                 .await?;
-            Ok(((), vec![grubsi_core::event::DomainEvent::ping()]))
+            Ok(((), vec![DomainEvent::ping()]))
         }
         .boxed()
     })
@@ -103,4 +133,12 @@ async fn events_are_returned_for_the_caller_to_publish_after_commit() {
     .unwrap();
 
     assert_eq!(written.events.len(), 1);
+    assert!(
+        matches!(rx.try_recv(), Err(TryRecvError::Empty)),
+        "write_tx published the event instead of returning it"
+    );
+
+    // The caller is the one that publishes, and only now.
+    hub.publish_all(written.events);
+    assert_eq!(rx.try_recv().unwrap().kind, EventKind::Ping);
 }

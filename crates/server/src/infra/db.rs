@@ -57,7 +57,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn wal_and_foreign_keys_are_enabled_on_both_pools() {
+    async fn the_connection_pragmas_are_set_on_both_pools() {
         let (_dir, db) = temp_db().await;
 
         for (name, pool) in [("write", &db.write), ("read", &db.read)] {
@@ -72,6 +72,22 @@ mod tests {
                 .await
                 .unwrap();
             assert_eq!(fk, 1, "{name} pool foreign_keys");
+
+            // NORMAL (1). Under WAL this is the durable-enough setting:
+            // a crash cannot corrupt the database, only lose the tail.
+            let synchronous: i64 = sqlx::query_scalar("PRAGMA synchronous")
+                .fetch_one(pool)
+                .await
+                .unwrap();
+            assert_eq!(synchronous, 1, "{name} pool synchronous");
+
+            // The single-writer pool should make SQLITE_BUSY impossible;
+            // this is the belt to that pair of braces.
+            let busy_timeout: i64 = sqlx::query_scalar("PRAGMA busy_timeout")
+                .fetch_one(pool)
+                .await
+                .unwrap();
+            assert_eq!(busy_timeout, 5_000, "{name} pool busy_timeout");
         }
     }
 

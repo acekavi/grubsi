@@ -32,7 +32,10 @@ async fn a_hanging_printer_times_out_rather_than_blocking_forever() {
     let printer = FakePrinter::start(FakeMode::Hang).await;
     let sink = TcpSink::new(printer.addr()).with_timeout(std::time::Duration::from_millis(200));
 
-    let err = sink.send(&vec![0u8; 4 * 1024 * 1024]).await.unwrap_err();
+    // Large enough that no plausible socket buffer can swallow it: at 4 MB
+    // a runner with a raised `wmem_max` could accept the whole write and
+    // the timeout would never fire.
+    let err = sink.send(&vec![0u8; 64 * 1024 * 1024]).await.unwrap_err();
     assert!(
         matches!(err, grubsi_escpos::sink::SinkError::Timeout),
         "got {err:?}"
