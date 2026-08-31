@@ -65,7 +65,11 @@ impl FakePrinter {
                         drop(stream);
                     }
                     FakeMode::Hang => {
-                        // Hold the connection open and never read from it.
+                        // Hold the connection open and never read from it. This
+                        // future never resolves, so this task services exactly
+                        // one connection and then never calls accept() again --
+                        // a second sender pointed at a Hang printer will just
+                        // block on connect/accept, it will not get its own hang.
                         std::future::pending::<()>().await;
                     }
                     FakeMode::DieMidJob => {
@@ -103,10 +107,14 @@ impl FakePrinter {
     /// Wait for the next completed job and return its bytes.
     pub async fn wait_for_job(&self) -> Vec<u8> {
         loop {
+            // Register interest BEFORE checking, so a job arriving in between
+            // still wakes us. notify_waiters() stores no permit, so the reverse
+            // order loses that notification permanently.
+            let notified = self.got_job.notified();
             if let Some(job) = self.received().into_iter().next() {
                 return job;
             }
-            self.got_job.notified().await;
+            notified.await;
         }
     }
 }
