@@ -1,16 +1,12 @@
-export type Envelope = {
-  boot_id: string;
-  seq: number;
-  kind: string;
-  topic: string;
-  payload: unknown;
-  at: string;
-};
+import type { components } from "./api/schema";
 
-export type Frame =
-  | { type: "HELLO"; boot_id: string; seq: number }
-  | { type: "EVENT"; envelope: Envelope }
-  | { type: "RESYNC" };
+// Both come from the server's OpenAPI. The socket frames used to be matched
+// to the server by hand, so nothing asserted that the `"RESYNC"` tag this
+// module switches on was the tag the server actually sends. Now a change on
+// the Rust side either regenerates this file — which CI's drift gate
+// catches — or fails to type-check here.
+export type Envelope = components["schemas"]["Envelope"];
+export type Frame = components["schemas"]["ClientFrame"];
 
 export type StreamState = { bootId: string | null; lastSeq: number };
 

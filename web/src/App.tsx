@@ -1,8 +1,11 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { connect } from "./lib/eventStream";
+import type { components } from "./lib/api/schema";
 
-type Health = { status: string; version: string; uptime_seconds: number };
+// Derived from the server's OpenAPI, not hand-written: the CI drift gate on
+// schema.ts is only meaningful if the app actually consumes it.
+type Health = components["schemas"]["HealthResponse"];
 
 export function App() {
   const queryClient = useQueryClient();

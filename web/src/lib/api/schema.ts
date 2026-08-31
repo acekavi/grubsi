@@ -25,6 +25,56 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * @description Every frame the server sends over `/ws`.
+         *
+         *     This is exported into the OpenAPI document so the generated TypeScript
+         *     client carries the socket contract too. The REST half already has a CI
+         *     drift gate; without this the `"RESYNC"` tag the client switches on was
+         *     matched to the server by hand.
+         */
+        ClientFrame: {
+            /** Format: uuid */
+            boot_id: string;
+            /** Format: int64 */
+            seq: number;
+            /** @enum {string} */
+            type: "HELLO";
+        } | {
+            envelope: components["schemas"]["Envelope"];
+            /** @enum {string} */
+            type: "EVENT";
+        } | {
+            /** @enum {string} */
+            type: "RESYNC";
+        };
+        /**
+         * @description One published event, as it appears on the wire.
+         *
+         *     `boot_id` changes on every server start and `seq` increases by exactly
+         *     one per event, so a client can detect both a restart and a gap and
+         *     respond with the same action: refetch.
+         */
+        Envelope: {
+            /** Format: date-time */
+            at: string;
+            /** Format: uuid */
+            boot_id: string;
+            /**
+             * @description One of the `EventKind` variants, SCREAMING_SNAKE_CASE (e.g. `PING`).
+             * @example PING
+             */
+            kind: string;
+            payload: unknown;
+            /** Format: int64 */
+            seq: number;
+            /**
+             * @description The topic key: `staff`, or `station:<uuid>` / `table:<uuid>` /
+             *     `check:<uuid>`.
+             * @example staff
+             */
+            topic: string;
+        };
         HealthResponse: {
             /** @description Always "ok" when the process is serving requests. */
             status: string;

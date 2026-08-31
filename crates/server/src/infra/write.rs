@@ -1,4 +1,3 @@
-use chrono::Utc;
 use futures::future::BoxFuture;
 use grubsi_core::event::DomainEvent;
 use serde_json::Value;
@@ -7,6 +6,7 @@ use uuid::Uuid;
 
 use crate::infra::db::Db;
 use crate::infra::error::{AppError, AppResult};
+use crate::infra::time::now_iso;
 
 /// What happened, who did it, and what changed.
 ///
@@ -90,7 +90,7 @@ where
     .bind(audit.entity_id)
     .bind(audit.before.as_ref().map(|v| v.to_string()))
     .bind(audit.after.as_ref().map(|v| v.to_string()))
-    .bind(Utc::now().to_rfc3339())
+    .bind(now_iso())
     .execute(&mut *tx)
     .await
     .map_err(|e| AppError::internal(format!("audit insert: {e}")))?;
