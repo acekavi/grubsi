@@ -10,6 +10,7 @@ check:
     cargo fmt --all -- --check
     cargo clippy --workspace --all-targets -- -D warnings
     ./scripts/check-core-deps.sh
+    ./scripts/check-write-path.sh
 
 test:
     cargo test --workspace
