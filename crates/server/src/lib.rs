@@ -52,5 +52,6 @@ pub fn build_router(state: AppState) -> Router {
         .nest("/api/v1", api)
         .route("/api-docs/openapi.json", get(openapi_json))
         .route("/ws", get(infra::ws::ws_handler))
+        .fallback(infra::assets::serve_asset)
         .with_state(state)
 }
