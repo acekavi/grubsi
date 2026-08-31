@@ -43,6 +43,26 @@ describe("event stream reducer", () => {
     expect(restarted.state.lastSeq).toBe(1);
   });
 
+  it("resyncs on a restart even when the sequence number happens to line up", () => {
+    // The giveaway is the boot_id, not the sequence. A restarted server
+    // begins numbering again, so seq alone cannot distinguish "next event"
+    // from "different server, first event" — this is the case that proves
+    // boot_id is checked independently.
+    let s = reduce(initialState, hello("boot-1")).state;
+    s = reduce(s, event("boot-1", 1)).state;
+
+    const restarted = reduce(s, event("boot-2", 2));
+    expect(restarted.action).toBe("resync");
+    expect(restarted.state.bootId).toBe("boot-2");
+    expect(restarted.state.lastSeq).toBe(2);
+  });
+
+  it("records HELLO without treating it as an event", () => {
+    const result = reduce(initialState, hello("boot-1", 7));
+    expect(result.action).toBe("ignore");
+    expect(result.state).toEqual({ bootId: "boot-1", lastSeq: 7 });
+  });
+
   it("treats an explicit RESYNC frame as a resync", () => {
     const s = reduce(initialState, hello("boot-1")).state;
     expect(reduce(s, { type: "RESYNC" }).action).toBe("resync");
