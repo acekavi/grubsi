@@ -4,6 +4,7 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 version = "0.1.0"
+default-run = "grubsi-server"
 
 [lib]
 name = "grubsi_server"
@@ -30,6 +31,7 @@ utoipa = { workspace = true }
 rust-embed = { workspace = true }
 futures = { workspace = true }
 mime_guess = { workspace = true }
+if-addrs = { workspace = true }
 
 [dev-dependencies]
 tower = { workspace = true, features = ["util"] }

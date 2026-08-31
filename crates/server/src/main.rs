@@ -35,15 +35,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 /// Best-effort list of this machine's LAN addresses, printed at startup so
 /// staff know what to type into a tablet. Never fatal.
+///
+/// Enumerates interfaces directly (via `if-addrs`) rather than shelling out:
+/// this must work with no default route and no `hostname -I` support, since
+/// the restaurant network may have no internet uplink at all.
 fn local_addresses() -> Vec<String> {
-    use std::process::Command;
-    let output = Command::new("hostname").arg("-I").output();
-    match output {
-        Ok(out) if out.status.success() => String::from_utf8_lossy(&out.stdout)
-            .split_whitespace()
-            .filter(|s| !s.contains(':'))
-            .map(|s| s.to_owned())
-            .collect(),
-        _ => Vec::new(),
-    }
+    if_addrs::get_if_addrs()
+        .map(|interfaces| {
+            interfaces
+                .into_iter()
+                .filter(|iface| !iface.is_loopback())
+                .filter_map(|iface| match iface.addr {
+                    if_addrs::IfAddr::V4(v4) => Some(v4.ip.to_string()),
+                    if_addrs::IfAddr::V6(_) => None,
+                })
+                .collect()
+        })
+        .unwrap_or_default()
 }
