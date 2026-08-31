@@ -69,7 +69,7 @@ The single-writer pool costs nothing at restaurant scale (a busy night is a few 
 
 ### 2.2 Identifiers and time
 
-UUIDv7 stored as `BLOB(16)` for all entity primary keys. Monotonic, so index locality stays good, and it satisfies MVP.md §45's requirement that customer URLs not expose internal database IDs without maintaining a parallel public-id column.
+UUIDv7 stored as `BLOB` for all entity primary keys (a STRICT table accepts only the bare type keywords `INT`, `INTEGER`, `REAL`, `TEXT`, `BLOB` and `ANY`, so the 16-byte width is a convention this project keeps, not a constraint the column can declare). Monotonic, so index locality stays good, and it satisfies MVP.md §45's requirement that customer URLs not expose internal database IDs without maintaining a parallel public-id column.
 
 QR tokens are 32 bytes of CSPRNG output, base64url-encoded, stored with a unique index, and individually revocable.
 
@@ -91,7 +91,7 @@ write_tx(
 
 Three things are enforced by the signature rather than by discipline:
 
-- **The audit record is a required argument.** You cannot commit a mutation without one, so MVP.md §36's audit trail cannot be forgotten by a feature written six milestones from now.
+- **The audit record is a required argument.** `write_tx` is the only write path in the codebase, and it will not run without an `AuditRecord`, so MVP.md §36's audit trail cannot be forgotten by a feature written six milestones from now. This is not yet a compiler guarantee — `Db.write` is a public pool, so code could open its own transaction — so `scripts/check-write-path.sh` fails the build if a transaction begins anywhere but `infra/write.rs`. Making the write pool private, which turns the guard into a type error, is planned for M1.
 - **Idempotency is available at the same seam** where it is needed, rather than bolted onto individual endpoints (see §4.6).
 - **Domain events are returned, not published**, which is what makes §6's after-commit rule structurally difficult to violate.
 
@@ -441,7 +441,7 @@ One `AppError` in `server::infra::error`, carrying:
 - a **mandatory** user-facing `message`
 - an internal detail that goes only to `tracing`
 
-MVP.md §48 is enforced by the type: it is not possible to construct an error that leaks `SQLITE_CONSTRAINT_UNIQUE` to a steward's tablet.
+MVP.md §48 is served by the shape of the type rather than absolutely guaranteed by it: a caller who passes internal detail as the user-facing `message` can still leak it. What the type does do is make the safe path the short one. The `From<sqlx::Error>` conversion routes every database error into the internal channel, so `SQLITE_CONSTRAINT_UNIQUE` never reaches a steward's tablet by default, and `internal()` is a one-argument call while leaking requires deliberately writing the detail into `message`.
 
 `core` returns typed domain errors (`PricingError`, `TransitionError`, `PermissionDenied`) and never knows HTTP exists; conversion happens at the `server` boundary.
 
