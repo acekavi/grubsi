@@ -38,9 +38,13 @@ export function App() {
         {health.isPending ? "checking…" : health.isError ? "unreachable" : `ok, v${health.data.version}`}
       </p>
       <p>Events received: {received}</p>
-      <button onClick={() => fetch("/api/v1/dev/ping", { method: "POST" })}>
-        Publish an event
-      </button>
+      {/* The server compiles /dev/ping out of release builds, so the button
+          that drives it is a dev-only control too. Both go in M4. */}
+      {import.meta.env.DEV && (
+        <button onClick={() => fetch("/api/v1/dev/ping", { method: "POST" })}>
+          Publish an event
+        </button>
+      )}
     </main>
   );
 }
