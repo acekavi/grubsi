@@ -1,15 +1,19 @@
 use std::net::SocketAddr;
 
+use grubsi_escpos::transport::fake::{FakeMode, FakePrinter};
 use grubsi_server::infra::db::Db;
 use grubsi_server::{AppState, build_router};
 use tempfile::TempDir;
 
-// `state` and `get_json` are unused by this task's test but are kept for
-// later tasks (Task 10 extends this harness with the fake printer).
-#[allow(dead_code)]
 pub struct TestApp {
     pub addr: SocketAddr,
+    #[allow(dead_code)]
     pub state: AppState,
+    // Unused by ws.rs, which doesn't touch the printer — used by harness.rs.
+    // Each integration-test binary compiles this module separately, so an
+    // item unused in one binary still needs its own allow.
+    #[allow(dead_code)]
+    pub printer: FakePrinter,
     _dir: TempDir,
 }
 
@@ -18,9 +22,16 @@ impl TestApp {
     /// throwaway database file. Not `:memory:` — WAL behaves differently
     /// there, and WAL is what production runs.
     pub async fn spawn() -> Self {
+        Self::spawn_with_printer(FakeMode::Ok).await
+    }
+
+    /// Like `spawn`, but with a fake printer listening in `mode`, reachable
+    /// at `printer.addr()`. M4's print queue tests build on this.
+    pub async fn spawn_with_printer(mode: FakeMode) -> Self {
         let dir = tempfile::tempdir().unwrap();
         let db = Db::open(&dir.path().join("grubsi.db")).await.unwrap();
         let state = AppState::new(db);
+        let printer = FakePrinter::start(mode).await;
 
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
@@ -33,6 +44,7 @@ impl TestApp {
         Self {
             addr,
             state,
+            printer,
             _dir: dir,
         }
     }
@@ -41,6 +53,8 @@ impl TestApp {
         format!("http://{}{}", self.addr, path)
     }
 
+    // Unused by harness.rs — used by ws.rs.
+    #[allow(dead_code)]
     pub async fn post(&self, path: &str) -> reqwest::Response {
         reqwest::Client::new()
             .post(self.url(path))
@@ -49,6 +63,7 @@ impl TestApp {
             .unwrap()
     }
 
+    // Unused by ws.rs — used by harness.rs.
     #[allow(dead_code)]
     pub async fn get_json(&self, path: &str) -> serde_json::Value {
         reqwest::get(self.url(path))
