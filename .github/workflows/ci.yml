@@ -31,3 +31,19 @@ jobs:
       - run: npm --prefix web ci
       - run: npm --prefix web run build
       - run: npm --prefix web run test
+
+  api-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.97
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+      - run: npm --prefix web ci
+      - name: Generated API client is up to date
+        run: |
+          cargo run --quiet --package grubsi-server --bin dump_openapi > openapi.json
+          npm --prefix web run gen:api
+          git diff --exit-code -- web/src/lib/api/schema.ts

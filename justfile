@@ -19,3 +19,12 @@ build:
     npm --prefix web ci
     npm --prefix web run build
     cargo build --release --package grubsi-server
+
+# Regenerate the TypeScript API client from the server's routes.
+gen-api:
+    cargo run --quiet --package grubsi-server --bin dump_openapi > openapi.json
+    npm --prefix web run gen:api
+
+# Fails if the committed client is stale. Run `just gen-api` to fix.
+check-api: gen-api
+    git diff --exit-code -- web/src/lib/api/schema.ts
