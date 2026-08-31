@@ -23,6 +23,7 @@ target
 node_modules
 web/dist/*
 !web/dist/.gitkeep
+*.tsbuildinfo
 openapi.json
 *.db
 *.db-wal
