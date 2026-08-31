@@ -34,3 +34,4 @@ mime_guess = { workspace = true }
 [dev-dependencies]
 tower = { workspace = true, features = ["util"] }
 tempfile = { workspace = true }
+http-body-util = "0.1"

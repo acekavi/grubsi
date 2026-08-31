@@ -602,6 +602,7 @@ dependencies = [
  "futures",
  "grubsi-core",
  "grubsi-escpos",
+ "http-body-util",
  "mime_guess",
  "rust-embed",
  "serde",
