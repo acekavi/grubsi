@@ -37,3 +37,6 @@ if-addrs = { workspace = true }
 tower = { workspace = true, features = ["util"] }
 tempfile = { workspace = true }
 http-body-util = "0.1"
+reqwest = { version = "0.13", default-features = false, features = ["json"] }
+tokio-tungstenite = "0.30"
+futures = { workspace = true }

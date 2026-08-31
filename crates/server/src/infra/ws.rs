@@ -66,6 +66,10 @@ impl EventHub {
         self.boot_id
     }
 
+    pub fn current_seq(&self) -> u64 {
+        self.seq.load(Ordering::SeqCst)
+    }
+
     pub fn subscribe(&self) -> broadcast::Receiver<Arc<Envelope>> {
         self.tx.subscribe()
     }
@@ -97,6 +101,72 @@ impl Default for EventHub {
     fn default() -> Self {
         Self::new()
     }
+}
+
+use axum::extract::State;
+use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
+use axum::response::Response;
+
+use crate::state::AppState;
+
+#[derive(Serialize)]
+#[serde(tag = "type")]
+enum ClientFrame<'a> {
+    #[serde(rename = "HELLO")]
+    Hello { boot_id: Uuid, seq: u64 },
+    #[serde(rename = "EVENT")]
+    Event { envelope: &'a Envelope },
+    #[serde(rename = "RESYNC")]
+    Resync,
+}
+
+pub async fn ws_handler(ws: WebSocketUpgrade, State(state): State<AppState>) -> Response {
+    ws.on_upgrade(move |socket| pump(socket, state))
+}
+
+async fn pump(mut socket: WebSocket, state: AppState) {
+    let hub = state.hub;
+
+    // Subscribe before sending HELLO so no event published between the two
+    // can slip past unnoticed.
+    let mut rx = hub.subscribe();
+    let hello = ClientFrame::Hello {
+        boot_id: hub.boot_id(),
+        seq: hub.current_seq(),
+    };
+    if send(&mut socket, &hello).await.is_err() {
+        return;
+    }
+
+    loop {
+        match frame_for(rx.recv().await) {
+            Some(Frame::Event(envelope)) => {
+                if send(
+                    &mut socket,
+                    &ClientFrame::Event {
+                        envelope: &envelope,
+                    },
+                )
+                .await
+                .is_err()
+                {
+                    return;
+                }
+            }
+            Some(Frame::Resync) => {
+                tracing::warn!("websocket subscriber lagged; asking client to resync");
+                if send(&mut socket, &ClientFrame::Resync).await.is_err() {
+                    return;
+                }
+            }
+            None => return,
+        }
+    }
+}
+
+async fn send(socket: &mut WebSocket, frame: &ClientFrame<'_>) -> Result<(), axum::Error> {
+    let text = serde_json::to_string(frame).expect("frames are serializable");
+    socket.send(Message::Text(text.into())).await
 }
 
 #[cfg(test)]

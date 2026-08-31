@@ -5,9 +5,11 @@ pub mod features;
 pub mod infra;
 pub mod state;
 
+use axum::extract::State;
 use axum::http::StatusCode;
-use axum::routing::get;
+use axum::routing::{get, post};
 use axum::{Json, Router};
+use grubsi_core::event::DomainEvent;
 use utoipa::OpenApi;
 
 pub use state::AppState;
@@ -29,16 +31,26 @@ async fn api_not_found() -> AppError {
     )
 }
 
+/// Publishes one event. This exists so the M0 skeleton has something to
+/// drive the socket; it is removed when real features begin emitting
+/// events in M4.
+async fn dev_ping(State(state): State<AppState>) -> StatusCode {
+    state.hub.publish(DomainEvent::ping());
+    StatusCode::ACCEPTED
+}
+
 pub fn build_router(state: AppState) -> Router {
     // Do not call `.with_state` on the inner router: `nest` requires both
     // routers to share a state type, and applying state early turns this
     // into a `Router<()>` that will not nest into a stateful parent.
     let api = Router::new()
         .route("/health", get(features::health::routes::health))
+        .route("/dev/ping", post(dev_ping))
         .fallback(api_not_found);
 
     Router::new()
         .nest("/api/v1", api)
         .route("/api-docs/openapi.json", get(openapi_json))
+        .route("/ws", get(infra::ws::ws_handler))
         .with_state(state)
 }
